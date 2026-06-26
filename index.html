@@ -1,840 +1,907 @@
 <!DOCTYPE html>
 <html lang="en" class="scroll-smooth">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ZeroCommit API — Pay-As-You-Go AI Tokens</title>
-<!-- Dependencies -->
-<script src="https://cdn.tailwindcss.com"></script>
-<!-- Fonts: 
-1. Bricolage Grotesque - Modern Ink Trap Font
-2. Instrument Serif - Elegant Editorial Italic
--->
-<link
-href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Instrument+Serif:ital@0;1&display=swap"
-rel="stylesheet">
-<script>
-tailwind.config = {
-theme: {
-extend: {
-fontFamily: {
-sans: ['"Bricolage Grotesque"', 'sans-serif'],
-cursive: ['"Instrument Serif"', 'serif'],
-},
-colors: {
-vercel: {
-black: '#000000',
-dark: '#0a0a0a',
-gray: '#121212',
-lightGray: '#1e1e1e',
-border: '#2a2a2a',
-accent: '#ffffff'
-},
-brand: {
-claude: '#e05c3e',
-gpt: '#10a37f',
-glm: '#5f60eb'
-}
-}
-}
-}
-}
-document.addEventListener('DOMContentLoaded', () => {
-// Premium custom cursor
-const cursor = document.getElementById('custom-cursor');
-if (window.matchMedia('(pointer: fine)').matches && cursor) {
-document.addEventListener('mousemove', (e) => {
-cursor.style.transform = translate3d(${e.clientX}px, ${e.clientY}px, 0) translate(-50%, -50%);
-});
-document.querySelectorAll('button, a, input, select, .interactive-card, .step-btn').forEach(el => {
-el.addEventListener('mouseenter', () => cursor.classList.add('cursor-hover'));
-el.addEventListener('mouseleave', () => cursor.classList.remove('cursor-hover'));
-});
-}
-// Dual-state sticky floating bottom action pill
-const finalSection = document.getElementById('final-section');
-const contactPill = document.getElementById('contact-pill');
-const pillContainer = document.getElementById('pill-container');
-const pillState1 = document.getElementById('pill-state-1');
-const pillState2 = document.getElementById('pill-state-2');
-if (pillContainer && pillState1 && pillState2) {
-pillState2.style.transform = 'translate(-50%, 100%)';
-pillState2.style.opacity = '0';
-pillState1.style.transform = 'translate(-50%, 0)';
-pillState1.style.opacity = '1';
-setTimeout(() => {
-pillContainer.style.width = pillState1.offsetWidth + 'px';
-}, 250);
-let isState1 = true;
-setInterval(() => {
-isState1 = !isState1;
-if (isState1) {
-pillContainer.style.width = pillState1.offsetWidth + 'px';
-pillState1.style.transform = 'translate(-50%, 0)';
-pillState1.style.opacity = '1';
-pillState2.style.transform = 'translate(-50%, 100%)';
-pillState2.style.opacity = '0';
-} else {
-pillContainer.style.width = pillState2.offsetWidth + 'px';
-pillState1.style.transform = 'translate(-50%, -100%)';
-pillState1.style.opacity = '0';
-pillState2.style.transform = 'translate(-50%, 0)';
-pillState2.style.opacity = '1';
-}
-}, 4000);
-}
-// Hide action pill near footer
-if (finalSection && contactPill) {
-const observer = new IntersectionObserver((entries) => {
-entries.forEach(entry => {
-if (entry.isIntersecting) {
-contactPill.classList.add('pill-hidden');
-} else {
-contactPill.classList.remove('pill-hidden');
-}
-});
-}, { threshold: 0.1 });
-observer.observe(finalSection);
-}
-// Scroll trigger logic with tight threshold to prevent mobile blocking
-const animatedElements = document.querySelectorAll('.animate-on-scroll');
-const elementObserver = new IntersectionObserver((entries) => {
-entries.forEach(entry => {
-if (entry.isIntersecting) {
-entry.target.classList.add('is-visible');
-}
-});
-}, { threshold: 0.01 });
-animatedElements.forEach(el => {
-elementObserver.observe(el);
-});
-// Interactive Multiplier & Visual Scale Engine (Supporting 8 Models in Correct Hierarchy)
-const tokenSlider = document.getElementById('token-slider');
-const sliderProgress = document.getElementById('slider-progress');
-const costDisplay = document.getElementById('calc-cost');
-const tokenUnitsDisplay = document.getElementById('calc-token-units');
-const stepButtons = document.querySelectorAll('.step-btn');
-const opus48Display = document.getElementById('calc-opus-48');
-const opus47Display = document.getElementById('calc-opus-47');
-const gpt55Display = document.getElementById('calc-gpt-55');
-const gpt54Display = document.getElementById('calc-gpt-54');
-const sonnetDisplay = document.getElementById('calc-sonnet-46');
-const haikuDisplay = document.getElementById('calc-haiku-45');
-const gpt54MiniDisplay = document.getElementById('calc-gpt-54-mini');
-const glmDisplay = document.getElementById('calc-glm-5');
-// Bar visual nodes
-const barOpus48 = document.getElementById('bar-opus-48');
-const barOpus47 = document.getElementById('bar-opus-47');
-const barGpt55 = document.getElementById('bar-gpt-55');
-const barGpt54 = document.getElementById('bar-gpt-54');
-const barSonnet = document.getElementById('bar-sonnet-46');
-const barHaiku = document.getElementById('bar-haiku-45');
-const barGpt54Mini = document.getElementById('bar-gpt-54-mini');
-const barGlm = document.getElementById('bar-glm-5');
-const sliderPacks = [
-{ price: 0.6, label: "1 Million Tokens (First-Time Trial)", benchmark: 1 },
-{ price: 1, label: "1 Million Tokens Plan", benchmark: 1 },
-{ price: 2, label: "3 Million Tokens Plan", benchmark: 3 },
-{ price: 4, label: "5 Million Tokens Plan", benchmark: 5 },
-{ price: 7, label: "10 Million Tokens Plan", benchmark: 10 },
-{ price: 30, label: "50 Million Tokens Plan", benchmark: 50 },
-{ price: 55, label: "100 Million Tokens Plan", benchmark: 100 }
-];
-let priceInterval;
-function animatePriceChange(newPrice) {
-// Instantly scale-up the cost container for tactile feedback
-costDisplay.classList.add('scale-110');
-// Spring back
-setTimeout(() => {
-costDisplay.classList.remove('scale-110');
-}, 150);
-// Quick high-tech pricing scramble roll
-let duration = 200;
-let steps = 5;
-let currentStep = 0;
-clearInterval(priceInterval);
-priceInterval = setInterval(() => {
-if (currentStep >= steps) {
-clearInterval(priceInterval);
-costDisplay.innerText = newPrice === 0.6 ? "$0.6" : $${newPrice};
-} else {
-// Display clean random pricing numbers to simulate high tech roll
-const randomPrice = (Math.random() * 60).toFixed(0);
-costDisplay.innerText = $${randomPrice};
-currentStep++;
-}
-}, duration / steps);
-}
-function updateCalculator() {
-const index = parseInt(tokenSlider.value, 10);
-const pack = sliderPacks[index];
-// Trigger animated transitions
-animatePriceChange(pack.price);
-tokenUnitsDisplay.innerText = pack.label;
-// Update active steps visual styles
-stepButtons.forEach((btn, idx) => {
-if(idx === index) {
-btn.classList.add('text-white', 'scale-110');
-btn.classList.remove('text-neutral-500');
-} else {
-btn.classList.remove('text-white', 'scale-110');
-btn.classList.add('text-neutral-500');
-}
-});
-// Update visual track highlighted width
-const percentage = (index / 6) * 100;
-sliderProgress.style.width = ${percentage}%;
-const base = pack.benchmark;
-// Calibrated baseline multipliers representing comparative sizing:
-const valOpus48 = base * 1.0;
-const valOpus47 = base * 1.25;
-const valGpt55 = base * 1.5;
-const valGpt54 = base * 3.0;
-const valSonnet = base * 5.0;
-const valHaiku = base * 8.0;      // Haiku 4.5 positioned logically above GPT 5.4 Mini
-const valGpt54Mini = base * 12.0;  // GPT 5.4 Mini stretches further (cheaper rate)
-const valGlm = base * 20.0;        // GLM 5 stretches to the maximum multiplier limit
-opus48Display.innerText = ${valOpus48.toFixed(1)}M;
-opus47Display.innerText = ${valOpus47.toFixed(1)}M;
-gpt55Display.innerText = ${valGpt55.toFixed(1)}M;
-gpt54Display.innerText = ${valGpt54.toFixed(1)}M;
-sonnetDisplay.innerText = ${valSonnet.toFixed(1)}M;
-haikuDisplay.innerText = ${valHaiku.toFixed(1)}M;
-gpt54MiniDisplay.innerText = ${valGpt54Mini.toFixed(1)}M;
-glmDisplay.innerText = ${valGlm.toFixed(1)}M;
-// Calculate visual percentage relative to absolute maximum capacity ceiling (GLM 5)
-const capVal = valGlm;
-// Scaled relative widths for clear, dynamic visualization
-barOpus48.style.width = ${Math.max(3, (valOpus48 / capVal) * 100)}%;
-barOpus47.style.width = ${Math.max(3, (valOpus47 / capVal) * 100)}%;
-barGpt55.style.width = ${Math.max(3, (valGpt55 / capVal) * 100)}%;
-barGpt54.style.width = ${Math.max(3, (valGpt54 / capVal) * 100)}%;
-barSonnet.style.width = ${Math.max(3, (valSonnet / capVal) * 100)}%;
-barHaiku.style.width = ${Math.max(3, (valHaiku / capVal) * 100)}%;
-barGpt54Mini.style.width = ${Math.max(3, (valGpt54Mini / capVal) * 100)}%;
-barGlm.style.width = '100%';
-}
-// Click label to snap slider directly
-stepButtons.forEach(btn => {
-btn.addEventListener('click', () => {
-const targetIndex = parseInt(btn.dataset.index, 10);
-tokenSlider.value = targetIndex;
-updateCalculator();
-});
-});
-if(tokenSlider) {
-tokenSlider.addEventListener('input', updateCalculator);
-updateCalculator();
-}
-});
-</script>
-<style>
-* {
-user-select: none !important;
--webkit-user-select: none !important;
-caret-color: transparent !important;
-}
-body {
-background-color: #000000;
-color: #ffffff;
-}
-@media (pointer: fine) {
-* {
-cursor: none !important;
-}
-}
-/* Hover Cursor */
-.custom-cursor {
-position: fixed;
-top: 0;
-left: 0;
-width: 12px;
-height: 12px;
-background-color: #ffffff;
-border-radius: 50%;
-pointer-events: none;
-z-index: 999999;
-transform: translate3d(-50%, -50%, 0);
-transition: width 0.2s cubic-bezier(0.25, 1, 0.5, 1), height 0.2s cubic-bezier(0.25, 1, 0.5, 1), background-color 0.2s, border 0.2s;
-mix-blend-mode: difference;
-display: none;
-will-change: transform;
-}
-@media (pointer: fine) {
-.custom-cursor {
-display: block;
-}
-}
-.custom-cursor.cursor-hover {
-width: 48px;
-height: 48px;
-background-color: transparent;
-border: 1px solid rgba(255, 255, 255, 0.85);
-}
-.ink-trap-title {
-font-family: 'Bricolage Grotesque', sans-serif;
-font-weight: 800;
-letter-spacing: -0.05em;
-line-height: 0.92;
-color: #ffffff;
-}
-.editorial-script {
-font-family: 'Instrument Serif', serif;
-font-style: italic;
-font-weight: 400;
-font-size: 1.1em;
-color: #ffffff;
-display: inline-block;
-transform: translateY(2%);
-margin: 0 0.04em;
-line-height: 0;
-}
-/* Floating Sticky Pill */
-.floating-pill {
-position: fixed;
-bottom: 30px;
-left: 50%;
-transform: translateX(-50%);
-z-index: 999;
-background: linear-gradient(180deg, rgba(12, 12, 12, 0.9) 0%, rgba(3, 3, 3, 0.98) 100%);
-backdrop-filter: blur(24px);
--webkit-backdrop-filter: blur(24px);
-border: 1px solid rgba(255, 255, 255, 0.08);
-border-top: 1px solid rgba(255, 255, 255, 0.22);
-color: #fff;
-padding: 0 2.8rem;
-height: 52px;
-border-radius: 999px;
-font-family: 'Bricolage Grotesque', sans-serif;
-font-weight: 700;
-font-size: 11px;
-text-transform: uppercase;
-letter-spacing: 0.12em;
-box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
-overflow: hidden;
-display: flex;
-align-items: center;
-justify-content: center;
-text-decoration: none;
-white-space: nowrap;
-}
-.floating-pill:hover {
-transform: translateX(-50%) translateY(-3px) scale(1.02);
-border: 1px solid rgba(255, 255, 255, 0.2);
-border-top: 1px solid rgba(255, 255, 255, 0.38);
-}
-.floating-pill.pill-hidden {
-opacity: 0;
-pointer-events: none;
-transform: translateX(-50%) translateY(30px);
-}
-.pill-dynamic-container {
-position: relative;
-height: 52px;
-overflow: hidden;
-transition: width 0.4s cubic-bezier(0.25, 1, 0.5, 1);
-}
-.pill-state {
-position: absolute;
-left: 50%;
-height: 52px;
-display: flex;
-align-items: center;
-justify-content: center;
-white-space: nowrap;
-width: max-content;
-transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s cubic-bezier(0.25, 1, 0.5, 1);
-}
-/* Entrance Animations */
-.animate-on-scroll {
-opacity: 0;
-transform: translateY(25px) scale(0.98);
-transition: opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1), transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
-will-change: opacity, transform;
-}
-.animate-on-scroll.is-visible {
-opacity: 1;
-transform: translateY(0) scale(1);
-}
-/* Subtle matrix pattern */
-.grid-background {
-background-size: 50px 50px;
-background-image:
-linear-gradient(to right, rgba(255, 255, 255, 0.015) 1px, transparent 1px),
-linear-gradient(to bottom, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
-}
-/* Custom tactile horizontal slider inputs overrides */
-input[type="range"]::-webkit-slider-runnable-track {
-background: transparent;
-height: 5px;
-}
-input[type="range"]::-webkit-slider-thumb {
--webkit-appearance: none;
-appearance: none;
-background: #ffffff;
-border-radius: 50%;
-height: 18px;
-width: 18px;
-margin-top: -6px;
-box-shadow: 0 0 14px rgba(255, 255, 255, 0.65), 0 2px 4px rgba(0,0,0,0.5);
-cursor: pointer;
-transition: transform 0.15s cubic-bezier(0.25, 1, 0.5, 1);
-}
-input[type="range"]::-webkit-slider-thumb:active {
-transform: scale(1.3);
-}
-/* Strict pointer overrides on all visible CTAs to override user select blocks */
-a, button {
-pointer-events: auto !important;
-cursor: pointer !important;
-}
-</style>
-</head>
-<body class="font-sans antialiased text-white select-none overflow-x-hidden">
-<!-- Custom Cursor -->
-<div id="custom-cursor" class="custom-cursor"></div>
-<!-- Persistent Navigation Floating action anchor targeting directly the main Whatsapp number -->
-<a href="https://wa.me/918303992749?text=Hello!%20I'm%20interested%20in%20getting%20access%20to%20the%20AI%20API%20Credits."
-target="_blank" rel="noopener noreferrer" id="contact-pill" class="floating-pill">
-<div id="pill-container" class="pill-dynamic-container">
-<span id="pill-state-1" class="pill-state text-white">Instant API Access</span>
-<span id="pill-state-2" class="pill-state text-white/50">Message on WhatsApp</span>
-</div>
-</a>
-<!-- STRUCTURAL CONTAINER -->
-<div class="relative w-full">
-<!-- HERO DISPLAY -->
-<section class="grid-background min-h-[90vh] md:min-h-screen py-24 px-4 flex flex-col justify-center items-center text-center relative border-b border-white/[0.04]">
-<div class="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black pointer-events-none"></div>
-<div class="animate-on-scroll is-visible mb-6 flex items-center gap-2 px-4 py-1.5 rounded-full border border-white/10 bg-white/[0.03] text-[10px] font-medium tracking-[0.2em] uppercase text-white/60">
-<span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
-Pay-As-You-Go API Credits
-</div>
-<!-- Big Ink Trap Header -->
-<h1 class="animate-on-scroll is-visible ink-trap-title text-4xl sm:text-5xl md:text-[7rem] tracking-tight text-center max-w-5xl font-extrabold" style="transition-delay: 100ms;">
-NO SUBSCRIPTIONS.<br class="hidden md:inline" />
-JUST <span class="editorial-script font-cursive text-white/90">unlimited</span> TOKENS.
-</h1>
-<p class="animate-on-scroll is-visible text-sm md:text-base text-white/40 mt-8 max-w-lg font-light tracking-wide leading-relaxed" style="transition-delay: 200ms;">
-Get direct access to Claude, GPT, and GLM. Buy what you need, use it whenever you want. Your credits never expire.
-</p>
-<div class="animate-on-scroll is-visible flex flex-col sm:flex-row gap-4 items-center justify-center mt-10 w-full max-w-xs sm:max-w-md" style="transition-delay: 300ms;">
-<a href="#token-packs" class="w-full sm:w-auto px-8 py-3 rounded-lg bg-white text-black font-semibold text-xs hover:bg-neutral-200 transition-all duration-300">
-See Token Packs
-</a>
-<a href="#calculator" class="w-full sm:w-auto px-8 py-3 rounded-lg border border-white/10 bg-white/[0.02] text-white/80 font-semibold text-xs hover:bg-white/[0.08] transition-all duration-300">
-Token Estimator
-</a>
-</div>
-</section>
-<!-- STORE FRONT: RETAIL PRICING PACKS -->
-<section id="token-packs" class="py-24 px-4 max-w-6xl mx-auto flex flex-col justify-center items-center">
-<div class="animate-on-scroll mb-4 text-[10px] font-bold tracking-[0.3em] uppercase text-white/40">
-Simple Pricing
-</div>
-<h2 class="animate-on-scroll ink-trap-title text-3xl sm:text-4xl md:text-[5rem] leading-[0.95] max-w-4xl text-center">
-One-Time <span class="editorial-script text-white/80">Token Packs</span>
-</h2>
-<p class="animate-on-scroll text-xs md:text-sm text-white/40 mt-4 max-w-xl text-center">
-Low entry prices to try things out, larger packs for active workloads. No recurring bills, no card setups required.
-</p>
-<!-- Grid displaying raw rounded pricing tiers -->
-<div class="animate-on-scroll grid grid-cols-2 lg:grid-cols-7 gap-3 w-full mt-12">
-<!-- Special First-Time Trial Tier -->
-<div class="interactive-card flex flex-col justify-between p-6 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.02] hover:border-emerald-500/40 hover:bg-emerald-500/[0.04] transition-all duration-300 text-left relative">
-<div class="absolute -top-2.5 left-2 px-2 py-0.5 bg-emerald-500 text-black font-extrabold text-[8px] uppercase tracking-wider rounded">
-New Users
-</div>
-<div>
-<div class="text-[9px] font-semibold text-emerald-400 tracking-widest uppercase">Trial Demo</div>
-<div class="text-xl font-black text-white mt-1">1M</div>
-<div class="text-xs text-white/40">Tokens</div>
-</div>
-<div class="mt-8">
-<div class="text-xl font-black text-white">$0.6</div>
-<div class="text-[9px] text-white/30">one-time payment</div>
-</div>
-</div>
-<!-- Pack 1 -->
-<div class="interactive-card flex flex-col justify-between p-6 rounded-lg border border-white/5 bg-vercel-dark hover:border-white/15 hover:bg-white/[0.01] transition-all duration-300 text-left">
-<div>
-<div class="text-[9px] font-semibold text-white/30 tracking-widest uppercase">Starter</div>
-<div class="text-xl font-black text-white mt-1">1M</div>
-<div class="text-xs text-white/40">Tokens</div>
-</div>
-<div class="mt-8">
-<div class="text-xl font-black text-white">$1</div>
-<div class="text-[9px] text-white/30">one-time payment</div>
-</div>
-</div>
-<!-- Pack 2 -->
-<div class="interactive-card flex flex-col justify-between p-6 rounded-lg border border-white/5 bg-vercel-dark hover:border-white/15 hover:bg-white/[0.01] transition-all duration-300 text-left">
-<div>
-<div class="text-[9px] font-semibold text-white/30 tracking-widest uppercase">Developer</div>
-<div class="text-xl font-black text-white mt-1">3M</div>
-<div class="text-xs text-white/40">Tokens</div>
-</div>
-<div class="mt-8">
-<div class="text-xl font-black text-white">$2</div>
-<div class="text-[9px] text-white/30">one-time payment</div>
-</div>
-</div>
-<!-- Pack 3 -->
-<div class="interactive-card flex flex-col justify-between p-6 rounded-lg border border-white/5 bg-vercel-dark hover:border-white/15 hover:bg-white/[0.01] transition-all duration-300 text-left">
-<div>
-<div class="text-[9px] font-semibold text-white/30 tracking-widest uppercase">Hobbyist</div>
-<div class="text-xl font-black text-white mt-1">5M</div>
-<div class="text-xs text-white/40">Tokens</div>
-</div>
-<div class="mt-8">
-<div class="text-xl font-black text-white">$4</div>
-<div class="text-[9px] text-white/30">one-time payment</div>
-</div>
-</div>
-<!-- Pack 4 -->
-<div class="interactive-card flex flex-col justify-between p-6 rounded-lg border border-white/15 bg-white/[0.02] relative hover:border-white/25 transition-all duration-300 text-left">
-<div class="absolute -top-2.5 right-2 px-2 py-0.5 bg-white text-black font-extrabold text-[8px] uppercase tracking-wider rounded">
-Best Value
-</div>
-<div>
-<div class="text-[9px] font-semibold text-white/40 tracking-widest uppercase">Standard</div>
-<div class="text-xl font-black text-white mt-1">10M</div>
-<div class="text-xs text-white/40">Tokens</div>
-</div>
-<div class="mt-8">
-<div class="text-xl font-black text-white">$7</div>
-<div class="text-[9px] text-white/30">one-time payment</div>
-</div>
-</div>
-<!-- Pack 5 -->
-<div class="interactive-card flex flex-col justify-between p-6 rounded-lg border border-white/5 bg-vercel-dark hover:border-white/15 hover:bg-white/[0.01] transition-all duration-300 text-left">
-<div>
-<div class="text-[9px] font-semibold text-white/30 tracking-widest uppercase">Pro Dev</div>
-<div class="text-xl font-black text-white mt-1">50M</div>
-<div class="text-xs text-white/40">Tokens</div>
-</div>
-<div class="mt-8">
-<div class="text-xl font-black text-white">$30</div>
-<div class="text-[9px] text-white/30">one-time payment</div>
-</div>
-</div>
-<!-- Pack 6 -->
-<div class="interactive-card flex flex-col justify-between p-6 rounded-lg border border-white/5 bg-vercel-dark hover:border-white/15 hover:bg-white/[0.01] transition-all duration-300 text-left">
-<div>
-<div class="text-[9px] font-semibold text-white/30 tracking-widest uppercase">Elite</div>
-<div class="text-xl font-black text-white mt-1">100M</div>
-<div class="text-xs text-white/40">Tokens</div>
-</div>
-<div class="mt-8">
-<div class="text-xl font-black text-white">$55</div>
-<div class="text-[9px] text-white/30">one-time payment</div>
-</div>
-</div>
-</div>
-<!-- Value Propositions Footer line -->
-<div class="animate-on-scroll mt-12 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 w-full border-t border-white/5 pt-8 max-w-4xl text-center">
-<div class="flex items-center justify-center gap-2">
-<span class="w-1.5 h-1.5 rounded-full bg-white/65"></span>
-<span class="text-xs font-semibold uppercase tracking-widest text-white/50">One-time purchase</span>
-</div>
-<div class="flex items-center justify-center gap-2">
-<span class="w-1.5 h-1.5 rounded-full bg-white/65"></span>
-<span class="text-xs font-semibold uppercase tracking-widest text-white/50">Never expires</span>
-</div>
-<div class="flex items-center justify-center gap-2">
-<span class="w-1.5 h-1.5 rounded-full bg-white/65"></span>
-<span class="text-xs font-semibold uppercase tracking-widest text-white/50">Instant Activation</span>
-</div>
-<div class="flex items-center justify-center gap-2">
-<span class="w-1.5 h-1.5 rounded-full bg-white/65"></span>
-<span class="text-xs font-semibold uppercase tracking-widest text-white/50">No recurring costs</span>
-</div>
-</div>
-</section>
-<!-- SECTION 3: INTERACTIVE MULTIPLIER PLAYGROUND WITH BRAND MARKS -->
-<section id="calculator" class="grid-background py-24 px-4 border-t border-white/[0.03] relative overflow-hidden">
-<div class="max-w-4xl mx-auto flex flex-col justify-center items-center">
-<div class="animate-on-scroll mb-4 text-[10px] font-bold tracking-[0.3em] uppercase text-white/40">
-How it works
-</div>
-<h2 class="animate-on-scroll ink-trap-title text-3xl sm:text-4xl md:text-[5rem] leading-[0.95] max-w-4xl text-center">
-How the tokens <span class="editorial-script text-white/80">scale</span>.
-</h2>
-<p class="animate-on-scroll text-xs md:text-sm text-white/40 mt-4 max-w-xl text-center">
-The token numbers displayed on our plans are calibrated against heavy benchmark models (Claude Opus 4.8). If you choose a lighter, faster model, your purchased credits stretch much further.
-</p>
-<!-- Redesigned Tactile Console -->
-<div class="animate-on-scroll max-w-2xl w-full p-6 md:p-8 rounded-xl border border-white/10 bg-vercel-dark/95 backdrop-blur-xl mt-12 text-left relative">
-<div class="flex justify-between items-end mb-6">
-<div>
-<span class="text-[10px] uppercase tracking-widest text-white/40 font-bold block mb-1">Select a Pack</span>
-<span id="calc-token-units" class="text-xl font-bold text-white tracking-tight transition-all duration-300">--</span>
-</div>
-<div class="text-right">
-<span id="calc-cost" class="text-3xl sm:text-4xl font-black text-white tracking-tight inline-block transform transition-transform duration-200 ease-out">$0.00</span>
-<span class="block text-[9px] text-white/30 mt-0.5">one-time payment</span>
-</div>
-</div>
-<!-- Enhanced Interactive Slider & Nodes Track -->
-<div class="relative w-full mb-8 pt-4">
-<!-- Clickable Step Nodes -->
-<div class="flex justify-between text-[11px] font-black text-neutral-500 mb-4 px-1.5">
-<button class="step-btn hover:text-white transition-all duration-200 focus:outline-none" data-index="0">TRIAL</button>
-<button class="step-btn hover:text-white transition-all duration-200 focus:outline-none" data-index="1">1M</button>
-<button class="step-btn hover:text-white transition-all duration-200 focus:outline-none" data-index="2">3M</button>
-<button class="step-btn hover:text-white transition-all duration-200 focus:outline-none" data-index="3">5M</button>
-<button class="step-btn hover:text-white transition-all duration-200 focus:outline-none" data-index="4">10M</button>
-<button class="step-btn hover:text-white transition-all duration-200 focus:outline-none" data-index="5">50M</button>
-<button class="step-btn hover:text-white transition-all duration-200 focus:outline-none" data-index="6">100M</button>
-</div>
-<!-- Tactile Track Background Wrapper -->
-<div class="relative h-1.5 w-full bg-white/5 rounded-full overflow-visible">
-<!-- Visual Progress Highlight -->
-<div id="slider-progress" class="absolute left-0 top-0 h-full bg-gradient-to-r from-neutral-800 to-white/40 rounded-full pointer-events-none transition-all duration-300" style="width: 50%;"></div>
-<!-- Pure Custom Range Slider overlapping transparently -->
-<input type="range" id="token-slider" min="0" max="6" value="3" class="absolute inset-0 w-full h-1.5 opacity-100 bg-transparent appearance-none outline-none cursor-pointer z-10">
-</div>
-</div>
-<!-- Models Brand Array (8 Models) -->
-<div class="space-y-4 pt-6 border-t border-white/5">
-<!-- Row 1: Claude Opus 4.8 -->
-<div class="group relative p-4 rounded-lg bg-white/[0.01] border border-white/5 hover:bg-white/[0.02] transition-all duration-300">
-<div class="flex justify-between items-center mb-3">
-<div class="flex items-center gap-3">
-<svg class="w-5 h-5 text-brand-claude transition-transform group-hover:scale-110 duration-300" viewBox="0 0 24 24" fill="currentColor">
-<path d="M12 2L9.2 8.4H2.4L7.6 12.8L4.8 19.2L12 15L19.2 19.2L16.4 12.8L21.6 8.4H14.8L12 2Z" />
-</svg>
-<div>
-<span class="text-[11px] font-bold uppercase tracking-widest text-white/80">Claude Opus 4.8</span>
-<p class="text-[9px] text-white/30 font-medium">Standard 1.0x Baseline Yield</p>
-</div>
-</div>
-<span id="calc-opus-48" class="text-sm font-black text-brand-claude">--</span>
-</div>
-<!-- Live Meter -->
-<div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
-<div id="bar-opus-48" class="h-full bg-gradient-to-r from-brand-claude/40 to-brand-claude rounded-full transition-all duration-500 ease-out" style="width: 5%;"></div>
-</div>
-</div>
-<!-- Row 2: Claude Opus 4.7 -->
-<div class="group relative p-4 rounded-lg bg-white/[0.01] border border-white/5 hover:bg-white/[0.02] transition-all duration-300">
-<div class="flex justify-between items-center mb-3">
-<div class="flex items-center gap-3">
-<svg class="w-5 h-5 text-brand-claude transition-transform group-hover:scale-110 duration-300" viewBox="0 0 24 24" fill="currentColor">
-<path d="M12 2L9.2 8.4H2.4L7.6 12.8L4.8 19.2L12 15L19.2 19.2L16.4 12.8L21.6 8.4H14.8L12 2Z" />
-</svg>
-<div>
-<span class="text-[11px] font-bold uppercase tracking-widest text-white/80">Claude Opus 4.7</span>
-<p class="text-[9px] text-white/30 font-medium">Optimized 1.25x Yield</p>
-</div>
-</div>
-<span id="calc-opus-47" class="text-sm font-black text-brand-claude">--</span>
-</div>
-<!-- Live Meter -->
-<div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
-<div id="bar-opus-47" class="h-full bg-gradient-to-r from-brand-claude/40 to-brand-claude rounded-full transition-all duration-500 ease-out" style="width: 6.25%;"></div>
-</div>
-</div>
-<!-- Row 3: GPT 5.5 -->
-<div class="group relative p-4 rounded-lg bg-white/[0.01] border border-white/5 hover:bg-white/[0.02] transition-all duration-300">
-<div class="flex justify-between items-center mb-3">
-<div class="flex items-center gap-3">
-<svg class="w-5 h-5 text-brand-gpt transition-transform group-hover:scale-110 duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-<circle cx="12" cy="12" r="10" />
-<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-<path d="M2 12h20" />
-</svg>
-<div>
-<span class="text-[11px] font-bold uppercase tracking-widest text-white/80">GPT 5.5</span>
-<p class="text-[9px] text-white/30 font-medium">Standard Scale 1.5x Yield</p>
-</div>
-</div>
-<span id="calc-gpt-55" class="text-sm font-black text-brand-gpt">--</span>
-</div>
-<!-- Live Meter -->
-<div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
-<div id="bar-gpt-55" class="h-full bg-gradient-to-r from-brand-gpt/40 to-brand-gpt rounded-full transition-all duration-500 ease-out" style="width: 7.5%;"></div>
-</div>
-</div>
-<!-- Row 4: GPT 5.4 -->
-<div class="group relative p-4 rounded-lg bg-white/[0.01] border border-white/5 hover:bg-white/[0.02] transition-all duration-300">
-<div class="flex justify-between items-center mb-3">
-<div class="flex items-center gap-3">
-<svg class="w-5 h-5 text-brand-gpt transition-transform group-hover:scale-110 duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-<circle cx="12" cy="12" r="10" />
-<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-<path d="M2 12h20" />
-</svg>
-<div>
-<span class="text-[11px] font-bold uppercase tracking-widest text-white/80">GPT 5.4</span>
-<p class="text-[9px] text-white/30 font-medium">Infrastructure Scale 3.0x Yield</p>
-</div>
-</div>
-<span id="calc-gpt-54" class="text-sm font-black text-brand-gpt">--</span>
-</div>
-<!-- Live Meter -->
-<div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
-<div id="bar-gpt-54" class="h-full bg-gradient-to-r from-brand-gpt/40 to-brand-gpt rounded-full transition-all duration-500 ease-out" style="width: 15%;"></div>
-</div>
-</div>
-<!-- Row 5: Sonnet 4.6 -->
-<div class="group relative p-4 rounded-lg bg-white/[0.01] border border-white/5 hover:bg-white/[0.02] transition-all duration-300">
-<div class="flex justify-between items-center mb-3">
-<div class="flex items-center gap-3">
-<svg class="w-5 h-5 text-brand-claude transition-transform group-hover:scale-110 duration-300" viewBox="0 0 24 24" fill="currentColor">
-<path d="M12 2L9.2 8.4H2.4L7.6 12.8L4.8 19.2L12 15L19.2 19.2L16.4 12.8L21.6 8.4H14.8L12 2Z" />
-</svg>
-<div>
-<span class="text-[11px] font-bold uppercase tracking-widest text-white/80">Sonnet 4.6</span>
-<p class="text-[9px] text-white/30 font-medium">Efficient Developer Scale 5.0x Yield</p>
-</div>
-</div>
-<span id="calc-sonnet-46" class="text-sm font-black text-brand-claude">--</span>
-</div>
-<!-- Live Meter -->
-<div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
-<div id="bar-sonnet-46" class="h-full bg-gradient-to-r from-brand-claude/40 to-brand-claude rounded-full transition-all duration-500 ease-out" style="width: 25%;"></div>
-</div>
-</div>
-<!-- Row 6: Haiku 4.5 -->
-<div class="group relative p-4 rounded-lg bg-orange-500/[0.01] border border-orange-500/10 hover:bg-orange-500/[0.03] transition-all duration-300">
-<div class="flex justify-between items-center mb-3">
-<div class="flex items-center gap-3">
-<svg class="w-5 h-5 text-brand-claude transition-transform group-hover:scale-110 duration-300" viewBox="0 0 24 24" fill="currentColor">
-<path d="M12 2L9.2 8.4H2.4L7.6 12.8L4.8 19.2L12 15L19.2 19.2L16.4 12.8L21.6 8.4H14.8L12 2Z" />
-</svg>
-<div>
-<span class="text-[11px] font-bold uppercase tracking-widest text-orange-400">Haiku 4.5</span>
-<p class="text-[9px] text-orange-500/40 font-medium">Fast Performance 8.0x Yield</p>
-</div>
-</div>
-<span id="calc-haiku-45" class="text-sm font-black text-orange-400">--</span>
-</div>
-<!-- Live Meter -->
-<div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
-<div id="bar-haiku-45" class="h-full bg-gradient-to-r from-orange-400/40 to-orange-400 rounded-full transition-all duration-500 ease-out" style="width: 40%;"></div>
-</div>
-</div>
-<!-- Row 7: GPT 5.4 Mini -->
-<div class="group relative p-4 rounded-lg bg-emerald-500/[0.01] border border-emerald-500/10 hover:bg-emerald-500/[0.03] transition-all duration-300">
-<div class="flex justify-between items-center mb-3">
-<div class="flex items-center gap-3">
-<svg class="w-5 h-5 text-brand-gpt transition-transform group-hover:scale-110 duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-<circle cx="12" cy="12" r="10" />
-<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-<path d="M2 12h20" />
-</svg>
-<div>
-<span class="text-[11px] font-bold uppercase tracking-widest text-emerald-400">GPT 5.4 Mini</span>
-<p class="text-[9px] text-emerald-500/40 font-medium">Ultra-Lightweight 12.0x Yield</p>
-</div>
-</div>
-<span id="calc-gpt-54-mini" class="text-sm font-black text-brand-gpt">--</span>
-</div>
-<!-- Live Meter -->
-<div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
-<div id="bar-gpt-54-mini" class="h-full bg-gradient-to-r from-brand-gpt/40 to-brand-gpt rounded-full transition-all duration-500 ease-out" style="width: 60%;"></div>
-</div>
-</div>
-<!-- Row 8: GLM 5 -->
-<div class="group relative p-4 rounded-lg bg-indigo-500/[0.01] border border-indigo-500/10 hover:bg-indigo-500/[0.03] transition-all duration-300">
-<div class="flex justify-between items-center mb-3">
-<div class="flex items-center gap-3">
-<svg class="w-5 h-5 text-brand-glm transition-transform group-hover:scale-110 duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-<rect x="3" y="3" width="7" height="9" />
-<rect x="14" y="3" width="7" height="5" />
-<rect x="14" y="12" width="7" height="9" />
-<rect x="3" y="16" width="7" height="5" />
-</svg>
-<div>
-<span class="text-[11px] font-bold uppercase tracking-widest text-indigo-400">GLM 5</span>
-<p class="text-[9px] text-indigo-500/40 font-medium">High Volume Scale 20.0x Yield</p>
-</div>
-</div>
-<span id="calc-glm-5" class="text-sm font-black text-brand-glm">--</span>
-</div>
-<!-- Live Meter -->
-<div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
-<div id="bar-glm-5" class="h-full bg-gradient-to-r from-brand-glm/40 to-brand-glm rounded-full transition-all duration-500 ease-out" style="width: 100%;"></div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</section>
-<!-- SECTION 4: REAL USE CASES -->
-<section class="py-24 px-4 max-w-5xl mx-auto border-t border-white/[0.03]">
-<div class="text-center">
-<div class="animate-on-scroll mb-4 text-[10px] font-bold tracking-[0.3em] uppercase text-white/40">
-Who is this for
-</div>
-<h2 class="animate-on-scroll ink-trap-title text-3xl sm:text-4xl md:text-[5rem] leading-[0.95] max-w-4xl text-center mx-auto">
-Built for <span class="editorial-script text-white/80">real builders</span>.
-</h2>
-</div>
-<div class="animate-on-scroll grid grid-cols-1 md:grid-cols-3 gap-6 mt-16 text-left">
-<!-- Card 1 -->
-<div class="p-6 rounded-xl border border-white/5 bg-vercel-dark hover:border-white/10 transition-all">
-<div class="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center mb-4">
-<svg class="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 009 11.5a13.96 13.96 0 00-2.28-7.48L6.2 3.89A2 2 0 017.8 1h8.4a2 2 0 011.6 2.89l-.52.93A13.96 13.96 0 0015 11.5c0 1.25-.164 2.463-.473 3.618m-1.218 3.518L13.1 21a2 2 0 01-3.21 0l-.318-.482"></path></svg>
-</div>
-<h3 class="text-lg font-bold text-white mb-2">Automated Bots & Agents</h3>
-<p class="text-xs text-white/40 leading-relaxed">
-Deploy tasks and background agents. They can loop safely without you hitting an unexpected credit card limit or account reset mid-task.
-</p>
-</div>
-<!-- Card 2 -->
-<div class="p-6 rounded-xl border border-white/5 bg-vercel-dark hover:border-white/10 transition-all">
-<div class="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center mb-4">
-<svg class="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-</div>
-<h3 class="text-lg font-bold text-white mb-2">Integrations & Workflows</h3>
-<p class="text-xs text-white/40 leading-relaxed">
-Run standard scripts, indexing, or cleanups. Small background tasks consume practically microscopic portions of your bought quota.
-</p>
-</div>
-<!-- Card 3 -->
-<div class="p-6 rounded-xl border border-white/5 bg-vercel-dark hover:border-white/10 transition-all">
-<div class="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center mb-4">
-<svg class="w-5 h-5 text-white/60" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-<path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 21m0 0l-.813-5.096M9 21h8.25m-8.25 0H5.25M17 11.25a2.5 2.5 0 11-5 0m5 0a2.5 2.5 0 115 0m-5 0h-5m0 0a2.5 2.5 0 11-5 0M12 7.5a2.5 2.5 0 110-5 2.5 2.5 0 010 7.5z"></path>
-</svg>
-</div>
-<h3 class="text-lg font-bold text-white mb-2">Hobbyist Projects</h3>
-<p class="text-xs text-white/40 leading-relaxed">
-Indie developers and students can prototype on weekends, put the project away for six months, and return with credits fully intact.
-</p>
-</div>
-</div>
-</section>
-<!-- SECTION 5: FINAL FORM AND CONTACT AREA -->
-<section id="final-section" class="grid-background py-32 px-4 flex flex-col justify-center items-center text-center">
-<div class="animate-on-scroll mb-4 text-[10px] font-bold tracking-[0.3em] uppercase text-white/40">
-Setup
-</div>
-<h2 class="animate-on-scroll ink-trap-title text-4xl sm:text-5xl md:text-[6.5rem] leading-[0.95] max-w-4xl text-center">
-Ready to deploy?
 
-<span class="editorial-script text-white/90">Get keys in minutes.</span>
-</h2>
-<p class="animate-on-scroll text-sm text-white/40 mt-8 max-w-md text-center leading-relaxed">
-Purchase your token packs directly over WhatsApp. We'll set up your endpoints and activate your credits right away.
-</p>
-<div class="animate-on-scroll flex flex-col gap-4 justify-center items-center mt-12 w-full max-w-sm">
-<!-- Premium WhatsApp Activation Button pointing to the direct WhatsApp phone number -->
-<a href="https://wa.me/918303992749?text=Hello!%20I'm%20interested%20in%20getting%20access%20to%20the%20AI%20API%20Credits."
-target="_blank" rel="noopener noreferrer" 
-class="w-full py-4 rounded-xl bg-white text-black font-extrabold text-xs uppercase tracking-widest text-center hover:bg-neutral-200 transition-all duration-300">
-Get Started on WhatsApp
-</a>
-<span class="text-[10px] uppercase tracking-widest text-white/30">Connect with us on WhatsApp at +91 8303992749</span>
-</div>
-<!-- Footer (Clean Reference-Only Disclaimer) -->
-<div class="mt-28 text-center text-[10px] text-white/20 tracking-wider">
-Benchmark calculations configured against standard Claude Opus public reference rates.
-</div>
-</section>
-</div>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZeroCommit API — Pay-As-You-Go AI Tokens</title>
+
+    <!-- Dependencies -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Fonts: 
+         1. Bricolage Grotesque - Modern Ink Trap Font
+         2. Instrument Serif - Elegant Editorial Italic
+    -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Instrument+Serif:ital@0;1&display=swap"
+        rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Bricolage Grotesque"', 'sans-serif'],
+                        cursive: ['"Instrument Serif"', 'serif'],
+                    },
+                    colors: {
+                        vercel: {
+                            black: '#000000',
+                            dark: '#0a0a0a',
+                            gray: '#121212',
+                            lightGray: '#1e1e1e',
+                            border: '#2a2a2a',
+                            accent: '#ffffff'
+                        },
+                        brand: {
+                            claude: '#e05c3e',
+                            gpt: '#10a37f',
+                            glm: '#5f60eb'
+                        }
+                    }
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const cursor = document.getElementById('custom-cursor');
+            if (window.matchMedia('(pointer: fine)').matches && cursor) {
+                document.addEventListener('mousemove', (e) => {
+                    cursor.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0) translate(-50%, -50%)`;
+                });
+
+                document.querySelectorAll('button, a, input, select, .interactive-card, .step-btn').forEach(el => {
+                    el.addEventListener('mouseenter', () => cursor.classList.add('cursor-hover'));
+                    el.addEventListener('mouseleave', () => cursor.classList.remove('cursor-hover'));
+                });
+            }
+
+            // Dual-state sticky floating bottom action pill
+            const finalSection = document.getElementById('final-section');
+            const contactPill = document.getElementById('contact-pill');
+            const pillContainer = document.getElementById('pill-container');
+            const pillState1 = document.getElementById('pill-state-1');
+            const pillState2 = document.getElementById('pill-state-2');
+
+            if (pillContainer && pillState1 && pillState2) {
+                pillState2.style.transform = 'translate(-50%, 100%)';
+                pillState2.style.opacity = '0';
+                pillState1.style.transform = 'translate(-50%, 0)';
+                pillState1.style.opacity = '1';
+
+                setTimeout(() => {
+                    pillContainer.style.width = pillState1.offsetWidth + 'px';
+                }, 250);
+
+                let isState1 = true;
+                setInterval(() => {
+                    isState1 = !isState1;
+                    if (isState1) {
+                        pillContainer.style.width = pillState1.offsetWidth + 'px';
+                        pillState1.style.transform = 'translate(-50%, 0)';
+                        pillState1.style.opacity = '1';
+                        pillState2.style.transform = 'translate(-50%, 100%)';
+                        pillState2.style.opacity = '0';
+                    } else {
+                        pillContainer.style.width = pillState2.offsetWidth + 'px';
+                        pillState1.style.transform = 'translate(-50%, -100%)';
+                        pillState1.style.opacity = '0';
+                        pillState2.style.transform = 'translate(-50%, 0)';
+                        pillState2.style.opacity = '1';
+                    }
+                }, 4000);
+            }
+
+            // Hide action pill near footer
+            if (finalSection && contactPill) {
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            contactPill.classList.add('pill-hidden');
+                        } else {
+                            contactPill.classList.remove('pill-hidden');
+                        }
+                    });
+                }, { threshold: 0.1 });
+
+                observer.observe(finalSection);
+            }
+
+            // Scroll trigger logic with tight threshold to prevent mobile blocking
+            const animatedElements = document.querySelectorAll('.animate-on-scroll');
+            const elementObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('is-visible');
+                    }
+                });
+            }, { threshold: 0.01 });
+
+            animatedElements.forEach(el => {
+                elementObserver.observe(el);
+            });
+
+            const tokenSlider = document.getElementById('token-slider');
+            const sliderProgress = document.getElementById('slider-progress');
+            const costDisplay = document.getElementById('calc-cost');
+            const tokenUnitsDisplay = document.getElementById('calc-token-units');
+            const stepButtons = document.querySelectorAll('.step-btn');
+            
+            const opus48Display = document.getElementById('calc-opus-48');
+            const opus47Display = document.getElementById('calc-opus-47');
+            const gpt55Display = document.getElementById('calc-gpt-55');
+            const gpt54Display = document.getElementById('calc-gpt-54');
+            const sonnetDisplay = document.getElementById('calc-sonnet-46');
+            const haikuDisplay = document.getElementById('calc-haiku-45');
+            const gpt54MiniDisplay = document.getElementById('calc-gpt-54-mini');
+            const glmDisplay = document.getElementById('calc-glm-5');
+
+            // Bar visual nodes
+            const barOpus48 = document.getElementById('bar-opus-48');
+            const barOpus47 = document.getElementById('bar-opus-47');
+            const barGpt55 = document.getElementById('bar-gpt-55');
+            const barGpt54 = document.getElementById('bar-gpt-54');
+            const barSonnet = document.getElementById('bar-sonnet-46');
+            const barHaiku = document.getElementById('bar-haiku-45');
+            const barGpt54Mini = document.getElementById('bar-gpt-54-mini');
+            const barGlm = document.getElementById('bar-glm-5');
+
+            const sliderPacks = [
+                { price: 0.6, label: "1 Million Tokens (First-Time Trial)", benchmark: 1 },
+                { price: 1, label: "1 Million Tokens Plan", benchmark: 1 },
+                { price: 2, label: "3 Million Tokens Plan", benchmark: 3 },
+                { price: 4, label: "5 Million Tokens Plan", benchmark: 5 },
+                { price: 7, label: "10 Million Tokens Plan", benchmark: 10 },
+                { price: 30, label: "50 Million Tokens Plan", benchmark: 50 },
+                { price: 55, label: "100 Million Tokens Plan", benchmark: 100 }
+            ];
+
+            let priceInterval;
+
+            function animatePriceChange(newPrice) {
+                // Instantly scale-up the cost container for tactile feedback
+                costDisplay.classList.add('scale-110');
+                
+                // Spring back
+                setTimeout(() => {
+                    costDisplay.classList.remove('scale-110');
+                }, 150);
+
+                // Quick high-tech pricing scramble roll
+                let duration = 200; 
+                let steps = 5;
+                let currentStep = 0;
+                clearInterval(priceInterval);
+                
+                priceInterval = setInterval(() => {
+                    if (currentStep >= steps) {
+                        clearInterval(priceInterval);
+                        costDisplay.innerText = newPrice === 0.6 ? "$0.6" : `$${newPrice}`;
+                    } else {
+                        const randomPrice = (Math.random() * 60).toFixed(0);
+                        costDisplay.innerText = `$${randomPrice}`;
+                        currentStep++;
+                    }
+                }, duration / steps);
+            }
+
+            function updateCalculator() {
+                const index = parseInt(tokenSlider.value, 10);
+                const pack = sliderPacks[index];
+
+                // Trigger animated transitions
+                animatePriceChange(pack.price);
+                tokenUnitsDisplay.innerText = pack.label;
+                
+                // Update active steps visual styles
+                stepButtons.forEach((btn, idx) => {
+                    if(idx === index) {
+                        btn.classList.add('text-white', 'scale-110');
+                        btn.classList.remove('text-neutral-500');
+                    } else {
+                        btn.classList.remove('text-white', 'scale-110');
+                        btn.classList.add('text-neutral-500');
+                    }
+                });
+
+                // Update visual track highlighted width
+                const percentage = (index / 6) * 100;
+                sliderProgress.style.width = `${percentage}%`;
+
+                const base = pack.benchmark;
+
+                // Multipliers relative to Opus 4.8 baseline cost calculated directly from "IMG_20260626_101607.jpg":
+                const valOpus48 = base * 1.0;
+                const valOpus47 = base * 1.0;
+                const valGpt55 = base * 1.5;
+                const valGpt54 = base * 3.0;
+                const valSonnet = base * 1.2;
+                const valHaiku = base * 6.0;      
+                const valGpt54Mini = base * 3.3;  
+                const valGlm = base * 2.0;        
+
+                opus48Display.innerText = `${valOpus48.toFixed(1)}M`;
+                opus47Display.innerText = `${valOpus47.toFixed(1)}M`;
+                gpt55Display.innerText = `${valGpt55.toFixed(1)}M`;
+                gpt54Display.innerText = `${valGpt54.toFixed(1)}M`;
+                sonnetDisplay.innerText = `${valSonnet.toFixed(1)}M`;
+                haikuDisplay.innerText = `${valHaiku.toFixed(1)}M`;
+                gpt54MiniDisplay.innerText = `${valGpt54Mini.toFixed(1)}M`;
+                glmDisplay.innerText = `${valGlm.toFixed(1)}M`;
+
+                // Calculate visual percentage relative to absolute maximum capacity ceiling (Haiku 4.5 = 6.0x yield)
+                const capVal = valHaiku;
+
+                // Scaled relative widths for clear, dynamic visualization
+                barOpus48.style.width = `${Math.max(3, (valOpus48 / capVal) * 100)}%`;
+                barOpus47.style.width = `${Math.max(3, (valOpus47 / capVal) * 100)}%`;
+                barGpt55.style.width = `${Math.max(3, (valGpt55 / capVal) * 100)}%`;
+                barGpt54.style.width = `${Math.max(3, (valGpt54 / capVal) * 100)}%`;
+                barSonnet.style.width = `${Math.max(3, (valSonnet / capVal) * 100)}%`;
+                barHaiku.style.width = '100%';
+                barGpt54Mini.style.width = `${Math.max(3, (valGpt54Mini / capVal) * 100)}%`;
+                barGlm.style.width = `${Math.max(3, (valGlm / capVal) * 100)}%`;
+            }
+
+            // Click label to snap slider directly
+            stepButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const targetIndex = parseInt(btn.dataset.index, 10);
+                    tokenSlider.value = targetIndex;
+                    updateCalculator();
+                });
+            });
+
+            if(tokenSlider) {
+                tokenSlider.addEventListener('input', updateCalculator);
+                updateCalculator(); 
+            }
+        });
+    </script>
+
+    <style>
+        * {
+            user-select: none !important;
+            -webkit-user-select: none !important;
+            caret-color: transparent !important;
+        }
+        body {
+            background-color: #000000;
+            color: #ffffff;
+        }
+        @media (pointer: fine) {
+            * { cursor: none !important; }
+        }
+        .custom-cursor {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 12px;
+            height: 12px;
+            background-color: #ffffff;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 999999;
+            transform: translate3d(-50%, -50%, 0);
+            transition: width 0.2s cubic-bezier(0.25, 1, 0.5, 1), height 0.2s cubic-bezier(0.25, 1, 0.5, 1), background-color 0.2s, border 0.2s;
+            mix-blend-mode: difference;
+            display: none;
+            will-change: transform;
+        }
+        @media (pointer: fine) {
+            .custom-cursor { display: block; }
+        }
+        .custom-cursor.cursor-hover {
+            width: 48px;
+            height: 48px;
+            background-color: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.85);
+        }
+        .ink-trap-title {
+            font-family: 'Bricolage Grotesque', sans-serif;
+            font-weight: 800;
+            letter-spacing: -0.05em;
+            line-height: 0.92;
+            color: #ffffff;
+        }
+        .editorial-script {
+            font-family: 'Instrument Serif', serif;
+            font-style: italic;
+            font-weight: 400;
+            font-size: 1.1em;
+            color: #ffffff;
+            display: inline-block;
+            transform: translateY(2%);
+            margin: 0 0.04em;
+            line-height: 0;
+        }
+        .floating-pill {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 999;
+            background: linear-gradient(180deg, rgba(12, 12, 12, 0.9) 0%, rgba(3, 3, 3, 0.98) 100%);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-top: 1px solid rgba(255, 255, 255, 0.22);
+            color: #fff;
+            padding: 0 2.8rem;
+            height: 52px;
+            border-radius: 999px;
+            font-family: 'Bricolage Grotesque', sans-serif;
+            font-weight: 700;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+        .floating-pill:hover {
+            transform: translateX(-50%) translateY(-3px) scale(1.02);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-top: 1px solid rgba(255, 255, 255, 0.38);
+        }
+        .floating-pill.pill-hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateX(-50%) translateY(30px);
+        }
+        .pill-dynamic-container {
+            position: relative;
+            height: 52px;
+            overflow: hidden;
+            transition: width 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .pill-state {
+            position: absolute;
+            left: 50%;
+            height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
+            width: max-content;
+            transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .animate-on-scroll {
+            opacity: 0;
+            transform: translateY(25px) scale(0.98);
+            transition: opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1), transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+            will-change: opacity, transform;
+        }
+        .animate-on-scroll.is-visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+        .grid-background {
+            background-size: 50px 50px;
+            background-image: 
+                linear-gradient(to right, rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            background: transparent;
+            height: 5px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            background: #ffffff;
+            border-radius: 50%;
+            height: 18px;
+            width: 18px;
+            margin-top: -6px;
+            box-shadow: 0 0 14px rgba(255, 255, 255, 0.65), 0 2px 4px rgba(0,0,0,0.5);
+            cursor: pointer;
+            transition: transform 0.15s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        input[type="range"]::-webkit-slider-thumb:active {
+            transform: scale(1.3);
+        }
+        a, button {
+            pointer-events: auto !important;
+            cursor: pointer !important;
+        }
+    </style>
+</head>
+
+<body class="font-sans antialiased text-white select-none overflow-x-hidden">
+
+    <!-- Custom Cursor -->
+    <div id="custom-cursor" class="custom-cursor"></div>
+
+    <!-- Floating Sticky Action Button -->
+    <a href="https://wa.me/918303992749?text=Hello!%20I'm%20interested%20in%20getting%20access%20to%20the%20AI%20API%20Credits."
+        target="_blank" rel="noopener noreferrer" id="contact-pill" class="floating-pill">
+        <div id="pill-container" class="pill-dynamic-container">
+            <span id="pill-state-1" class="pill-state text-white">Instant API Access</span>
+            <span id="pill-state-2" class="pill-state text-white/50">Message on WhatsApp</span>
+        </div>
+    </a>
+
+    <!-- BODY WRAPPER -->
+    <div class="relative w-full">
+
+        <!-- SECTION 1: HERO DISPLAY -->
+        <section class="grid-background min-h-[90vh] md:min-h-screen py-24 px-4 flex flex-col justify-center items-center text-center relative border-b border-white/[0.04]">
+            <div class="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black pointer-events-none"></div>
+            
+            <div class="animate-on-scroll is-visible mb-6 flex items-center gap-2 px-4 py-1.5 rounded-full border border-white/10 bg-white/[0.03] text-[10px] font-medium tracking-[0.2em] uppercase text-white/60">
+                <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                Pay-As-You-Go API Credits
+            </div>
+
+            <!-- Header -->
+            <h1 class="animate-on-scroll is-visible ink-trap-title text-4xl sm:text-5xl md:text-[7rem] tracking-tight text-center max-w-5xl font-extrabold" style="transition-delay: 100ms;">
+                NO SUBSCRIPTIONS.<br class="hidden md:inline" />
+                JUST <span class="editorial-script font-cursive text-white/90">unlimited</span> TOKENS.
+            </h1>
+
+            <p class="animate-on-scroll is-visible text-sm md:text-base text-white/40 mt-8 max-w-lg font-light tracking-wide leading-relaxed" style="transition-delay: 200ms;">
+                Get direct access to Claude, GPT, and GLM. Buy what you need, use it whenever you want. Your credits never expire.
+            </p>
+
+            <div class="animate-on-scroll is-visible flex flex-col sm:flex-row gap-4 items-center justify-center mt-10 w-full max-w-xs sm:max-w-md" style="transition-delay: 300ms;">
+                <a href="#token-packs" class="w-full sm:w-auto px-8 py-3 rounded-lg bg-white text-black font-semibold text-xs hover:bg-neutral-200 transition-all duration-300">
+                    See Token Packs
+                </a>
+                <a href="#calculator" class="w-full sm:w-auto px-8 py-3 rounded-lg border border-white/10 bg-white/[0.02] text-white/80 font-semibold text-xs hover:bg-white/[0.08] transition-all duration-300">
+                    Token Estimator
+                </a>
+            </div>
+        </section>
+
+
+        <!-- STORE FRONT: RETAIL PRICING PACKS -->
+        <section id="token-packs" class="py-24 px-4 max-w-6xl mx-auto flex flex-col justify-center items-center">
+            
+            <div class="animate-on-scroll mb-4 text-[10px] font-bold tracking-[0.3em] uppercase text-white/40">
+                Simple Pricing
+            </div>
+
+            <h2 class="animate-on-scroll ink-trap-title text-3xl sm:text-4xl md:text-[5rem] leading-[0.95] max-w-4xl text-center">
+                One-Time <span class="editorial-script text-white/80">Token Packs</span>
+            </h2>
+
+            <p class="animate-on-scroll text-xs md:text-sm text-white/40 mt-4 max-w-xl text-center">
+                Low entry prices to try things out, larger packs for active workloads. No recurring bills, no card setups required.
+            </p>
+
+            <!-- Pricing matrix -->
+            <div class="animate-on-scroll grid grid-cols-2 lg:grid-cols-7 gap-3 w-full mt-12">
+                
+                <!-- Special First-Time Trial Tier -->
+                <div class="interactive-card flex flex-col justify-between p-6 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.02] hover:border-emerald-500/40 hover:bg-emerald-500/[0.04] transition-all duration-300 text-left relative">
+                    <div class="absolute -top-2.5 left-2 px-2 py-0.5 bg-emerald-500 text-black font-extrabold text-[8px] uppercase tracking-wider rounded">New Users</div>
+                    <div>
+                        <div class="text-[9px] font-semibold text-emerald-400 tracking-widest uppercase">Trial Demo</div>
+                        <div class="text-xl font-black text-white mt-1">1M</div>
+                        <div class="text-xs text-white/40">Tokens</div>
+                    </div>
+                    <div class="mt-8">
+                        <div class="text-xl font-black text-white">$0.6</div>
+                        <div class="text-[9px] text-white/30">one-time payment</div>
+                    </div>
+                </div>
+
+                <!-- Pack 1 -->
+                <div class="interactive-card flex flex-col justify-between p-6 rounded-lg border border-white/5 bg-vercel-dark hover:border-white/15 hover:bg-white/[0.01] transition-all duration-300 text-left">
+                    <div>
+                        <div class="text-[9px] font-semibold text-white/30 tracking-widest uppercase">Starter</div>
+                        <div class="text-xl font-black text-white mt-1">1M</div>
+                        <div class="text-xs text-white/40">Tokens</div>
+                    </div>
+                    <div class="mt-8">
+                        <div class="text-xl font-black text-white">$1</div>
+                        <div class="text-[9px] text-white/30">one-time payment</div>
+                    </div>
+                </div>
+
+                <!-- Pack 2 -->
+                <div class="interactive-card flex flex-col justify-between p-6 rounded-lg border border-white/5 bg-vercel-dark hover:border-white/15 hover:bg-white/[0.01] transition-all duration-300 text-left">
+                    <div>
+                        <div class="text-[9px] font-semibold text-white/30 tracking-widest uppercase">Developer</div>
+                        <div class="text-xl font-black text-white mt-1">3M</div>
+                        <div class="text-xs text-white/40">Tokens</div>
+                    </div>
+                    <div class="mt-8">
+                        <div class="text-xl font-black text-white">$2</div>
+                        <div class="text-[9px] text-white/30">one-time payment</div>
+                    </div>
+                </div>
+
+                <!-- Pack 3 -->
+                <div class="interactive-card flex flex-col justify-between p-6 rounded-lg border border-white/5 bg-vercel-dark hover:border-white/15 hover:bg-white/[0.01] transition-all duration-300 text-left">
+                    <div>
+                        <div class="text-[9px] font-semibold text-white/30 tracking-widest uppercase">Hobbyist</div>
+                        <div class="text-xl font-black text-white mt-1">5M</div>
+                        <div class="text-xs text-white/40">Tokens</div>
+                    </div>
+                    <div class="mt-8">
+                        <div class="text-xl font-black text-white">$4</div>
+                        <div class="text-[9px] text-white/30">one-time payment</div>
+                    </div>
+                </div>
+
+                <!-- Pack 4 -->
+                <div class="interactive-card flex flex-col justify-between p-6 rounded-lg border border-white/15 bg-white/[0.02] relative hover:border-white/25 transition-all duration-300 text-left">
+                    <div class="absolute -top-2.5 right-2 px-2 py-0.5 bg-white text-black font-extrabold text-[8px] uppercase tracking-wider rounded">Best Value</div>
+                    <div>
+                        <div class="text-[9px] font-semibold text-white/40 tracking-widest uppercase">Standard</div>
+                        <div class="text-xl font-black text-white mt-1">10M</div>
+                        <div class="text-xs text-white/40">Tokens</div>
+                    </div>
+                    <div class="mt-8">
+                        <div class="text-xl font-black text-white">$7</div>
+                        <div class="text-[9px] text-white/30">one-time payment</div>
+                    </div>
+                </div>
+
+                <!-- Pack 5 -->
+                <div class="interactive-card flex flex-col justify-between p-6 rounded-lg border border-white/5 bg-vercel-dark hover:border-white/15 hover:bg-white/[0.01] transition-all duration-300 text-left">
+                    <div>
+                        <div class="text-[9px] font-semibold text-white/30 tracking-widest uppercase">Pro Dev</div>
+                        <div class="text-xl font-black text-white mt-1">50M</div>
+                        <div class="text-xs text-white/40">Tokens</div>
+                    </div>
+                    <div class="mt-8">
+                        <div class="text-xl font-black text-white">$30</div>
+                        <div class="text-[9px] text-white/30">one-time payment</div>
+                    </div>
+                </div>
+
+                <!-- Pack 6 -->
+                <div class="interactive-card flex flex-col justify-between p-6 rounded-lg border border-white/5 bg-vercel-dark hover:border-white/15 hover:bg-white/[0.01] transition-all duration-300 text-left">
+                    <div>
+                        <div class="text-[9px] font-semibold text-white/30 tracking-widest uppercase">Elite</div>
+                        <div class="text-xl font-black text-white mt-1">100M</div>
+                        <div class="text-xs text-white/40">Tokens</div>
+                    </div>
+                    <div class="mt-8">
+                        <div class="text-xl font-black text-white">$55</div>
+                        <div class="text-[9px] text-white/30">one-time payment</div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Value Proposition Footer check items -->
+            <div class="animate-on-scroll mt-12 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 w-full border-t border-white/5 pt-8 max-w-4xl text-center">
+                <div class="flex items-center justify-center gap-2">
+                    <span class="w-1.5 h-1.5 rounded-full bg-white/65"></span>
+                    <span class="text-xs font-semibold uppercase tracking-widest text-white/50">One-time purchase</span>
+                </div>
+                <div class="flex items-center justify-center gap-2">
+                    <span class="w-1.5 h-1.5 rounded-full bg-white/65"></span>
+                    <span class="text-xs font-semibold uppercase tracking-widest text-white/50">Never expires</span>
+                </div>
+                <div class="flex items-center justify-center gap-2">
+                    <span class="w-1.5 h-1.5 rounded-full bg-white/65"></span>
+                    <span class="text-xs font-semibold uppercase tracking-widest text-white/50">Instant Activation</span>
+                </div>
+                <div class="flex items-center justify-center gap-2">
+                    <span class="w-1.5 h-1.5 rounded-full bg-white/65"></span>
+                    <span class="text-xs font-semibold uppercase tracking-widest text-white/50">No recurring costs</span>
+                </div>
+            </div>
+        </section>
+
+
+
+        <!-- ESTIMATOR CONSOLE -->
+        <section id="calculator" class="grid-background py-24 px-4 border-t border-white/[0.03] relative overflow-hidden">
+            <div class="max-w-4xl mx-auto flex flex-col justify-center items-center">
+                
+                <div class="animate-on-scroll mb-4 text-[10px] font-bold tracking-[0.3em] uppercase text-white/40">How it works</div>
+
+                <h2 class="animate-on-scroll ink-trap-title text-3xl sm:text-4xl md:text-[5rem] leading-[0.95] max-w-4xl text-center">
+                    How the tokens <span class="editorial-script text-white/80">scale</span>.
+                </h2>
+
+                <p class="animate-on-scroll text-xs md:text-sm text-white/40 mt-4 max-w-xl text-center">
+                    The token numbers displayed on our plans are calibrated against heavy benchmark models (Claude Opus 4.8). If you choose a lighter, faster model, your purchased credits stretch much further.
+                </p>
+
+                <!-- Console Console -->
+                <div class="animate-on-scroll max-w-2xl w-full p-6 md:p-8 rounded-xl border border-white/10 bg-vercel-dark/95 backdrop-blur-xl mt-12 text-left relative">
+                    
+                    <div class="flex justify-between items-end mb-6">
+                        <div>
+                            <span class="text-[10px] uppercase tracking-widest text-white/40 font-bold block mb-1">Select a Pack</span>
+                            <span id="calc-token-units" class="text-xl font-bold text-white tracking-tight transition-all duration-300">--</span>
+                        </div>
+                        <div class="text-right">
+                            <span id="calc-cost" class="text-3xl sm:text-4xl font-black text-white tracking-tight inline-block transform transition-transform duration-200 ease-out">$0.00</span>
+                            <span class="block text-[9px] text-white/30 mt-0.5">one-time payment</span>
+                        </div>
+                    </div>
+
+                    <!-- Steps Selection Track overlay -->
+                    <div class="relative w-full mb-8 pt-4">
+                        <!-- Custom labels step mapping -->
+                        <div class="flex justify-between text-[11px] font-black text-neutral-500 mb-4 px-1.5">
+                            <button class="step-btn hover:text-white transition-all duration-200 focus:outline-none" data-index="0">TRIAL</button>
+                            <button class="step-btn hover:text-white transition-all duration-200 focus:outline-none" data-index="1">1M</button>
+                            <button class="step-btn hover:text-white transition-all duration-200 focus:outline-none" data-index="2">3M</button>
+                            <button class="step-btn hover:text-white transition-all duration-200 focus:outline-none" data-index="3">5M</button>
+                            <button class="step-btn hover:text-white transition-all duration-200 focus:outline-none" data-index="4">10M</button>
+                            <button class="step-btn hover:text-white transition-all duration-200 focus:outline-none" data-index="5">50M</button>
+                            <button class="step-btn hover:text-white transition-all duration-200 focus:outline-none" data-index="6">100M</button>
+                        </div>
+                        
+                        <!-- Tactile Track Background Wrapper -->
+                        <div class="relative h-1.5 w-full bg-white/5 rounded-full overflow-visible">
+                            <!-- Visual Progress Highlight -->
+                            <div id="slider-progress" class="absolute left-0 top-0 h-full bg-gradient-to-r from-neutral-800 to-white/40 rounded-full pointer-events-none transition-all duration-300" style="width: 50%;"></div>
+                            <!-- Slider thumb input range -->
+                            <input type="range" id="token-slider" min="0" max="6" value="3" class="absolute inset-0 w-full h-1.5 opacity-100 bg-transparent appearance-none outline-none cursor-pointer z-10">
+                        </div>
+                    </div>
+
+                    <!-- Models Brand Array supporting database metrics from IMG_20260626_101607.jpg -->
+                    <div class="space-y-4 pt-6 border-t border-white/5">
+                        
+                        <!-- Claude Opus 4.8 (Baseline Multiplier: 3) -->
+                        <div class="group relative p-4 rounded-lg bg-white/[0.01] border border-white/5 hover:bg-white/[0.02] transition-all duration-300">
+                            <div class="flex justify-between items-center mb-3">
+                                <div class="flex items-center gap-3">
+                                    <svg class="w-5 h-5 text-brand-claude transition-transform group-hover:scale-110 duration-300" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 2L9.2 8.4H2.4L7.6 12.8L4.8 19.2L12 15L19.2 19.2L16.4 12.8L21.6 8.4H14.8L12 2Z" />
+                                    </svg>
+                                    <div>
+                                        <span class="text-[11px] font-bold uppercase tracking-widest text-white/80">Claude Opus 4.8</span>
+                                        <p class="text-[9px] text-white/30 font-medium">Standard 1.0x Baseline Yield (Multiplier: 3)</p>
+                                    </div>
+                                </div>
+                                <span id="calc-opus-48" class="text-sm font-black text-brand-claude">--</span>
+                            </div>
+                            <div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+                                <div id="bar-opus-48" class="h-full bg-gradient-to-r from-brand-claude/40 to-brand-claude rounded-full transition-all duration-500 ease-out" style="width: 5%;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Claude Opus 4.7 (Multiplier: 3) -->
+                        <div class="group relative p-4 rounded-lg bg-white/[0.01] border border-white/5 hover:bg-white/[0.02] transition-all duration-300">
+                            <div class="flex justify-between items-center mb-3">
+                                <div class="flex items-center gap-3">
+                                    <svg class="w-5 h-5 text-brand-claude transition-transform group-hover:scale-110 duration-300" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 2L9.2 8.4H2.4L7.6 12.8L4.8 19.2L12 15L19.2 19.2L16.4 12.8L21.6 8.4H14.8L12 2Z" />
+                                    </svg>
+                                    <div>
+                                        <span class="text-[11px] font-bold uppercase tracking-widest text-white/80">Claude Opus 4.7</span>
+                                        <p class="text-[9px] text-white/30 font-medium">Standard 1.0x Baseline Yield (Multiplier: 3)</p>
+                                    </div>
+                                </div>
+                                <span id="calc-opus-47" class="text-sm font-black text-brand-claude">--</span>
+                            </div>
+                            <div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+                                <div id="bar-opus-47" class="h-full bg-gradient-to-r from-brand-claude/40 to-brand-claude rounded-full transition-all duration-500 ease-out" style="width: 5%;"></div>
+                            </div>
+                        </div>
+
+                        <!-- GPT 5.5 (Multiplier: 2) -->
+                        <div class="group relative p-4 rounded-lg bg-white/[0.01] border border-white/5 hover:bg-white/[0.02] transition-all duration-300">
+                            <div class="flex justify-between items-center mb-3">
+                                <div class="flex items-center gap-3">
+                                    <svg class="w-5 h-5 text-brand-gpt transition-transform group-hover:scale-110 duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                                        <path d="M2 12h20" />
+                                    </svg>
+                                    <div>
+                                        <span class="text-[11px] font-bold uppercase tracking-widest text-white/80">GPT 5.5</span>
+                                        <p class="text-[9px] text-white/30 font-medium">Standard Scale 1.5x Yield (Multiplier: 2)</p>
+                                    </div>
+                                </div>
+                                <span id="calc-gpt-55" class="text-sm font-black text-brand-gpt">--</span>
+                            </div>
+                            <div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+                                <div id="bar-gpt-55" class="h-full bg-gradient-to-r from-brand-gpt/40 to-brand-gpt rounded-full transition-all duration-500 ease-out" style="width: 7.5%;"></div>
+                            </div>
+                        </div>
+
+                        <!-- GPT 5.4 (Multiplier: 1) -->
+                        <div class="group relative p-4 rounded-lg bg-white/[0.01] border border-white/5 hover:bg-white/[0.02] transition-all duration-300">
+                            <div class="flex justify-between items-center mb-3">
+                                <div class="flex items-center gap-3">
+                                    <svg class="w-5 h-5 text-brand-gpt transition-transform group-hover:scale-110 duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                                        <path d="M2 12h20" />
+                                    </svg>
+                                    <div>
+                                        <span class="text-[11px] font-bold uppercase tracking-widest text-white/80">GPT 5.4</span>
+                                        <p class="text-[9px] text-white/30 font-medium">Infrastructure Scale 3.0x Yield (Multiplier: 1)</p>
+                                    </div>
+                                </div>
+                                <span id="calc-gpt-54" class="text-sm font-black text-brand-gpt">--</span>
+                            </div>
+                            <div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+                                <div id="bar-gpt-54" class="h-full bg-gradient-to-r from-brand-gpt/40 to-brand-gpt rounded-full transition-all duration-500 ease-out" style="width: 15%;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Claude Sonnet 4.6 (Multiplier: 2.5) -->
+                        <div class="group relative p-4 rounded-lg bg-white/[0.01] border border-white/5 hover:bg-white/[0.02] transition-all duration-300">
+                            <div class="flex justify-between items-center mb-3">
+                                <div class="flex items-center gap-3">
+                                    <svg class="w-5 h-5 text-brand-claude transition-transform group-hover:scale-110 duration-300" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 2L9.2 8.4H2.4L7.6 12.8L4.8 19.2L12 15L19.2 19.2L16.4 12.8L21.6 8.4H14.8L12 2Z" />
+                                    </svg>
+                                    <div>
+                                        <span class="text-[11px] font-bold uppercase tracking-widest text-white/80">Sonnet 4.6</span>
+                                        <p class="text-[9px] text-white/30 font-medium">Efficient Developer Scale 1.2x Yield (Multiplier: 2.5)</p>
+                                    </div>
+                                </div>
+                                <span id="calc-sonnet-46" class="text-sm font-black text-brand-claude">--</span>
+                            </div>
+                            <div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+                                <div id="bar-sonnet-46" class="h-full bg-gradient-to-r from-brand-claude/40 to-brand-claude rounded-full transition-all duration-500 ease-out" style="width: 25%;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Claude Haiku 4.5 (Multiplier: 0.5) -->
+                        <div class="group relative p-4 rounded-lg bg-orange-500/[0.01] border border-orange-500/10 hover:bg-orange-500/[0.03] transition-all duration-300">
+                            <div class="flex justify-between items-center mb-3">
+                                <div class="flex items-center gap-3">
+                                    <svg class="w-5 h-5 text-brand-claude transition-transform group-hover:scale-110 duration-300" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 2L9.2 8.4H2.4L7.6 12.8L4.8 19.2L12 15L19.2 19.2L16.4 12.8L21.6 8.4H14.8L12 2Z" />
+                                    </svg>
+                                    <div>
+                                        <span class="text-[11px] font-bold uppercase tracking-widest text-orange-400">Haiku 4.5</span>
+                                        <p class="text-[9px] text-orange-500/40 font-medium">Fast Performance 6.0x Yield (Multiplier: 0.5)</p>
+                                    </div>
+                                </div>
+                                <span id="calc-haiku-45" class="text-sm font-black text-orange-400">--</span>
+                            </div>
+                            <div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+                                <div id="bar-haiku-45" class="h-full bg-gradient-to-r from-orange-400/40 to-orange-400 rounded-full transition-all duration-500 ease-out" style="width: 40%;"></div>
+                            </div>
+                        </div>
+
+                        <!-- GPT 5.4 Mini (Multiplier: 0.9) -->
+                        <div class="group relative p-4 rounded-lg bg-emerald-500/[0.01] border border-emerald-500/10 hover:bg-emerald-500/[0.03] transition-all duration-300">
+                            <div class="flex justify-between items-center mb-3">
+                                <div class="flex items-center gap-3">
+                                    <svg class="w-5 h-5 text-brand-gpt transition-transform group-hover:scale-110 duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                                        <path d="M2 12h20" />
+                                    </svg>
+                                    <div>
+                                        <span class="text-[11px] font-bold uppercase tracking-widest text-emerald-400">GPT 5.4 Mini</span>
+                                        <p class="text-[9px] text-emerald-500/40 font-medium">Ultra-Lightweight 3.3x Yield (Multiplier: 0.9)</p>
+                                    </div>
+                                </div>
+                                <span id="calc-gpt-54-mini" class="text-sm font-black text-brand-gpt">--</span>
+                            </div>
+                            <div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+                                <div id="bar-gpt-54-mini" class="h-full bg-gradient-to-r from-brand-gpt/40 to-brand-gpt rounded-full transition-all duration-500 ease-out" style="width: 60%;"></div>
+                            </div>
+                        </div>
+
+                        <!-- GLM 5 (Multiplier: 1.5) -->
+                        <div class="group relative p-4 rounded-lg bg-indigo-500/[0.01] border border-indigo-500/10 hover:bg-indigo-500/[0.03] transition-all duration-300">
+                            <div class="flex justify-between items-center mb-3">
+                                <div class="flex items-center gap-3">
+                                    <svg class="w-5 h-5 text-brand-glm transition-transform group-hover:scale-110 duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="3" y="3" width="7" height="9" />
+                                        <rect x="14" y="3" width="7" height="5" />
+                                        <rect x="14" y="12" width="7" height="9" />
+                                        <rect x="3" y="16" width="7" height="5" />
+                                    </svg>
+                                    <div>
+                                        <span class="text-[11px] font-bold uppercase tracking-widest text-indigo-400">GLM 5</span>
+                                        <p class="text-[9px] text-indigo-500/40 font-medium">High Volume Scale 2.0x Yield (Multiplier: 1.5)</p>
+                                    </div>
+                                </div>
+                                <span id="calc-glm-5" class="text-sm font-black text-brand-glm">--</span>
+                            </div>
+                            <div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+                                <div id="bar-glm-5" class="h-full bg-gradient-to-r from-brand-glm/40 to-brand-glm rounded-full transition-all duration-500 ease-out" style="width: 100%;"></div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+        </section>
+
+
+        <!-- SECTION 4: REAL USE CASES -->
+        <section class="py-24 px-4 max-w-5xl mx-auto border-t border-white/[0.03]">
+            <div class="text-center">
+                <div class="animate-on-scroll mb-4 text-[10px] font-bold tracking-[0.3em] uppercase text-white/40">Who is this for</div>
+                <h2 class="animate-on-scroll ink-trap-title text-3xl sm:text-4xl md:text-[5rem] leading-[0.95] max-w-4xl text-center mx-auto">
+                    Built for <span class="editorial-script text-white/80">real builders</span>.
+                </h2>
+            </div>
+
+            <div class="animate-on-scroll grid grid-cols-1 md:grid-cols-3 gap-6 mt-16 text-left">
+                
+                <!-- Card 1 -->
+                <div class="p-6 rounded-xl border border-white/5 bg-vercel-dark hover:border-white/10 transition-all">
+                    <div class="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center mb-4">
+                        <svg class="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 009 11.5a13.96 13.96 0 00-2.28-7.48L6.2 3.89A2 2 0 017.8 1h8.4a2 2 0 011.6 2.89l-.52.93A13.96 13.96 0 0015 11.5c0 1.25-.164 2.463-.473 3.618m-1.218 3.518L13.1 21a2 2 0 01-3.21 0l-.318-.482"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-white mb-2">Automated Bots &amp; Agents</h3>
+                    <p class="text-xs text-white/40 leading-relaxed">
+                        Deploy tasks and background agents. They can loop safely without you hitting an unexpected credit card limit or account reset mid-task.
+                    </p>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="p-6 rounded-xl border border-white/5 bg-vercel-dark hover:border-white/10 transition-all">
+                    <div class="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center mb-4">
+                        <svg class="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-white mb-2">Integrations &amp; Workflows</h3>
+                    <p class="text-xs text-white/40 leading-relaxed">
+                        Run standard scripts, indexing, or cleanups. Small background tasks consume practically microscopic portions of your bought quota.
+                    </p>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="p-6 rounded-xl border border-white/5 bg-vercel-dark hover:border-white/10 transition-all">
+                    <div class="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center mb-4">
+                        <svg class="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-white mb-2">Hobbyist Projects</h3>
+                    <p class="text-xs text-white/40 leading-relaxed">
+                        Indie developers and students can prototype on weekends, put the project away for six months, and return with credits fully intact.
+                    </p>
+                </div>
+
+            </div>
+        </section>
+
+
+
+        <!-- SECTION 5: FINAL CALL TO ACTION (CONTACT) -->
+        <section id="final-section" class="grid-background py-32 px-4 flex flex-col justify-center items-center text-center">
+            
+            <div class="animate-on-scroll mb-4 text-[10px] font-bold tracking-[0.3em] uppercase text-white/40">Setup</div>
+
+            <h2 class="animate-on-scroll ink-trap-title text-4xl sm:text-5xl md:text-[6.5rem] leading-[0.95] max-w-4xl text-center">
+                Ready to deploy?<br/>
+                <span class="editorial-script text-white/90">Get keys in minutes.</span>
+            </h2>
+
+            <p class="animate-on-scroll text-sm text-white/40 mt-8 max-w-md text-center leading-relaxed">
+                Purchase your token packs directly over WhatsApp. We'll set up your endpoints and activate your credits right away.
+            </p>
+
+            <div class="animate-on-scroll flex flex-col gap-4 justify-center items-center mt-12 w-full max-w-sm">
+                <!-- WhatsApp button pointing to WhatsApp direct line -->
+                <a href="https://wa.me/918303992749?text=Hello!%20I'm%20interested%20in%20getting%20access%20to%20the%20AI%20API%20Credits."
+                    target="_blank" rel="noopener noreferrer" 
+                    class="w-full py-4 rounded-xl bg-white text-black font-extrabold text-xs uppercase tracking-widest text-center hover:bg-neutral-200 transition-all duration-300">
+                    Get Started on WhatsApp
+                </a>
+                <span class="text-[10px] uppercase tracking-widest text-white/30">Connect with us on WhatsApp at +91 8303992749</span>
+            </div>
+
+            <!-- Footer -->
+            <div class="mt-28 text-center text-[10px] text-white/20 tracking-wider">
+                Benchmark calculations configured against standard Claude Opus public reference rates.
+            </div>
+        </section>
+
+    </div>
+
 </body>
 </html>
